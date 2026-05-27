@@ -7,5 +7,5 @@ username = os.environ.get("MYSQL_USERNAME", 'root')
 password = os.environ.get("MYSQL_PASSWORD", '9CPcksGG')
 db_address = os.environ.get(
     "MYSQL_ADDRESS",
-    'sh-cynosdbmysql-grp-3c7a1auu.sql.tencentcdb.com:20699'
+    'sh-cynosdbmysql-grp-lq5288ye.sql.tencentcdb.com:21835'
 )
