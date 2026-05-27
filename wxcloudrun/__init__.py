@@ -11,8 +11,13 @@ app = Flask(__name__, instance_relative_config=True)
 app.config['DEBUG'] = config.DEBUG
 
 # 设定数据库链接
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://{}:{}@{}/flask_demo'.format(config.username, config.password,
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://{}:{}@{}/scentrise'.format(config.username, config.password,
                                                                              config.db_address)
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_recycle': 3600,
+    'pool_pre_ping': True,
+}
 
 # 初始化DB操作对象
 db = SQLAlchemy(app)
