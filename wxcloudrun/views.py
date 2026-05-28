@@ -378,7 +378,7 @@ def admin_get_tag(tag_id):
 def admin_create_tag():
     from wxcloudrun.model import Tag
     data = request.get_json()
-    tag = Tag(name=data['name'], category=data.get('category', ''), description=data.get('description', ''),
+    tag = Tag(name=data['name'], category=data.get('category', ''),
               sort_order=data.get('sortOrder', 0))
     db.session.add(tag)
     db.session.commit()
@@ -392,7 +392,7 @@ def admin_update_tag(tag_id):
     if not tag:
         return make_err_response('标签不存在')
     data = request.get_json()
-    for field in ['name', 'category', 'description', 'icon', 'banner_image', 'sort_order']:
+    for field in ['name', 'category', 'icon', 'banner_image', 'sort_order']:
         if field in data:
             setattr(tag, field, data[field])
     if 'sortOrder' in data:

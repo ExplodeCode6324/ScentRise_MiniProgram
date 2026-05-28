@@ -301,7 +301,7 @@ async function renderTags() {
 
 async function renderTagForm(id) {
     const isEdit = !!id;
-    let t = { name:'', category:'适用产品', description:'', sortOrder:0, icon:'', bannerImage:'' };
+    let t = { name:'', category:'适用产品', sortOrder:0, icon:'', bannerImage:'' };
     if (isEdit) { const data = await apiFetch('/api/admin/tags/' + id); t = data.data; }
     return `
         <div class="page-header"><h2>${isEdit?'编辑':'添加'}标签</h2><button class="btn btn-outline" onclick="navigate('tags')">← 返回</button></div>
@@ -311,7 +311,6 @@ async function renderTagForm(id) {
                 <div class="form-group"><label>分类</label><select name="category">
                     ${['产品系列','适用产品'].map(c=>`<option ${t.category==c?'selected':''}>${c}</option>`).join('')}
                 </select></div>
-                <div class="form-group"><label>描述</label><textarea name="description">${t.description||''}</textarea></div>
                 <div class="form-group"><label>排序</label><input name="sortOrder" type="number" value="${t.sortOrder||0}"></div>
                 <button type="submit" class="btn btn-primary">保存</button>
             </form>
@@ -467,7 +466,7 @@ async function delProduct(id) {
 async function saveTag(e, id) {
     e.preventDefault();
     const fd = new FormData(e.target);
-    const body = { name: fd.get('name'), category: fd.get('category'), description: fd.get('description'), sortOrder: parseInt(fd.get('sortOrder'))||0 };
+    const body = { name: fd.get('name'), category: fd.get('category'), sortOrder: parseInt(fd.get('sortOrder'))||0 };
     const method = id ? 'PUT' : 'POST';
     const url = id ? '/api/admin/tags/' + id : '/api/admin/tags';
     const data = await apiFetch(url, { method, body: JSON.stringify(body) });
