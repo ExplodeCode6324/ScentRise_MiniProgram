@@ -605,6 +605,23 @@ def admin_upload_company_logo():
     return make_succ_response({'url': storage_url, 'id': info.id})
 
 
+@app.route('/api/admin/company/qr', methods=['POST'])
+def admin_upload_company_qr():
+    file = request.files.get('file')
+    if not file:
+        return make_err_response('请选择文件')
+    info = _get_or_create_company_info()
+    ext = file.filename.rsplit('.', 1)[-1] if '.' in file.filename else 'png'
+    cloud_path = 'company/{}/wechat_qr.{}'.format(info.id, ext)
+    result = storage_upload(file.read(), cloud_path)
+    if not result['success']:
+        return make_err_response(result.get('error', '上传失败'))
+    storage_url = result['url']
+    info.wechat_qr = storage_url
+    db.session.commit()
+    return make_succ_response({'url': storage_url, 'id': info.id})
+
+
 @app.route('/api/admin/company/image', methods=['POST'])
 def admin_upload_company_image():
     file = request.files.get('file')

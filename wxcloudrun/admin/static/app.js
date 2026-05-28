@@ -27,8 +27,9 @@ async function apiFetch(url, options = {}) {
         logout();
         throw new Error('登录已过期');
     }
-    if (!data.success && data.errcode !== undefined) {
-        throw new Error(data.errmsg || '请求失败');
+    // 后端返回 {code: 0, data: ...} 或 {code: -1, errorMsg: ...}
+    if (data.code !== undefined && data.code !== 0) {
+        throw new Error(data.errorMsg || '请求失败');
     }
     return data;
 }
@@ -459,11 +460,13 @@ async function saveTag(e, id) {
 async function delTag(id) { if(!confirm('确定删除标签？'))return; await apiFetch('/api/admin/tags/'+id,{method:'DELETE'}); showToast('已删除'); navigate('tags'); }
 
 async function uploadTagImage(tagId, type) {
-    const fileInput = document.getElementById(type==='icon'?'tag-icon-file':'tag-banner-file');
-    if (!fileInput.files[0]) return showToast('请选择文件', 'error');
-    const fd = new FormData(); fd.append('file', fileInput.files[0]); fd.append('type', type);
-    await apiFetch('/api/admin/tags/' + tagId + '/image', { method: 'POST', body: fd });
-    showToast('上传成功'); navigate('tags/' + tagId);
+    try {
+        const fileInput = document.getElementById(type==='icon'?'tag-icon-file':'tag-banner-file');
+        if (!fileInput.files[0]) return showToast('请选择文件', 'error');
+        const fd = new FormData(); fd.append('file', fileInput.files[0]); fd.append('type', type);
+        await apiFetch('/api/admin/tags/' + tagId + '/image', { method: 'POST', body: fd });
+        showToast('上传成功'); navigate('tags/' + tagId);
+    } catch(e) { showToast(e.message, 'error'); }
 }
 
 async function saveCollection(e, id) {
@@ -478,10 +481,12 @@ async function saveCollection(e, id) {
 
 async function delCollection(id) { if(!confirm('确定删除合集？'))return; await apiFetch('/api/admin/collections/'+id,{method:'DELETE'}); showToast('已删除'); navigate('collections'); }
 async function uploadCollectionCover(id) {
-    const f = document.getElementById('col-cover-file'); if(!f.files[0]) return showToast('请选择文件','error');
-    const fd = new FormData(); fd.append('file', f.files[0]);
-    await apiFetch('/api/admin/collections/'+id+'/image',{method:'POST',body:fd});
-    showToast('上传成功'); navigate('collections/'+id);
+    try {
+        const f = document.getElementById('col-cover-file'); if(!f.files[0]) return showToast('请选择文件','error');
+        const fd = new FormData(); fd.append('file', f.files[0]);
+        await apiFetch('/api/admin/collections/'+id+'/image',{method:'POST',body:fd});
+        showToast('上传成功'); navigate('collections/'+id);
+    } catch(e) { showToast(e.message, 'error'); }
 }
 
 async function saveArticle(e, id) {
@@ -497,10 +502,12 @@ async function saveArticle(e, id) {
 
 async function delArticle(id) { if(!confirm('确定删除文章？'))return; await apiFetch('/api/admin/articles/'+id,{method:'DELETE'}); showToast('已删除'); navigate('articles'); }
 async function uploadArticleCover(id) {
-    const f = document.getElementById('article-cover-file'); if(!f.files[0]) return showToast('请选择文件','error');
-    const fd = new FormData(); fd.append('file', f.files[0]);
-    await apiFetch('/api/admin/articles/'+id+'/image',{method:'POST',body:fd});
-    showToast('上传成功'); navigate('articles/'+id);
+    try {
+        const f = document.getElementById('article-cover-file'); if(!f.files[0]) return showToast('请选择文件','error');
+        const fd = new FormData(); fd.append('file', f.files[0]);
+        await apiFetch('/api/admin/articles/'+id+'/image',{method:'POST',body:fd});
+        showToast('上传成功'); navigate('articles/'+id);
+    } catch(e) { showToast(e.message, 'error'); }
 }
 
 async function saveCompany(e) {
@@ -512,10 +519,89 @@ async function saveCompany(e) {
 }
 
 async function uploadCompanyLogo() {
-    const f = document.getElementById('company-logo-file'); if(!f.files[0]) return showToast('请选择文件','error');
-    const fd = new FormData(); fd.append('file', f.files[0]);
-    await apiFetch('/api/admin/company/logo',{method:'POST',body:fd});
-    showToast('上传成功'); navigate('company');
+    try {
+        const f = document.getElementById('company-logo-file'); if(!f.files[0]) return showToast('请选择文件','error');
+        const fd = new FormData(); fd.append('file', f.files[0]);
+        await apiFetch('/api/admin/company/logo',{method:'POST',body:fd});
+        showToast('上传成功'); navigate('company');
+    } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function uploadCompanyQR() {
+    try {
+        const f = document.getElementById('company-qr-file'); if(!f.files[0]) return showToast('请选择文件','error');
+        const fd = new FormData(); fd.append('file', f.files[0]);
+        await apiFetch('/api/admin/company/qr',{method:'POST',body:fd});
+        showToast('上传成功'); navigate('company');
+    } catch(e) { showToast(e.message, 'error'); }
+}
+
+// ==================== 产品图片上传 ====================
+async function uploadProductImage(productId) {
+    try {
+        const fileInput = document.getElementById('product-img-file');
+        if (!fileInput || !fileInput.files[0]) return showToast('请选择文件', 'error');
+        const imgType = document.querySelector('input[name="imgType"]:checked');
+        const imageType = imgType ? imgType.value : 'main';
+        const fd = new FormData();
+        fd.append('file', fileInput.files[0]);
+        fd.append('image_type', imageType);
+        await apiFetch('/api/admin/products/' + productId + '/images', { method: 'POST', body: fd });
+        showToast('上传成功');
+        navigate('products/' + productId);
+    } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function delProductImage(productId, imageId) {
+    try {
+        if (!confirm('确定删除该图片？')) return;
+        await apiFetch('/api/admin/products/' + productId + '/images/' + imageId, { method: 'DELETE' });
+        showToast('已删除');
+        navigate('products/' + productId);
+    } catch(e) { showToast(e.message, 'error'); }
+}
+
+// ==================== 产品搜索 ====================
+function searchProducts() {
+    const keyword = document.getElementById('search-input').value.toLowerCase();
+    const rows = document.querySelectorAll('#app-content table tbody tr');
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        row.style.display = text.includes(keyword) ? '' : 'none';
+    });
+}
+
+// ==================== Excel 导入 ====================
+async function importExcel(input) {
+    if (!input.files[0]) return;
+    try {
+        // 使用 SheetJS 解析 Excel（需在 HTML 中引入 CDN）
+        const reader = new FileReader();
+        reader.onload = async function(e) {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, {type: 'array'});
+                const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                const rows = XLSX.utils.sheet_to_json(sheet);
+                // 字段映射: 产品系列→productSeries, 产品名称→productName, 产品型号→productModel, 产品描述→productDesc
+                const mapped = rows.map(r => ({
+                    productSeries: r['产品系列'] || r['productSeries'] || '',
+                    productName: r['产品名称'] || r['productName'] || '',
+                    productModel: r['产品型号'] || r['productModel'] || '',
+                    productDesc: r['产品描述'] || r['productDesc'] || '',
+                    tags: (r['标签'] || r['tags'] || '').toString().split(/[,，;；]/).map(t => t.trim()).filter(Boolean),
+                }));
+                const result = await apiFetch('/api/admin/import', { method: 'POST', body: JSON.stringify({ rows: mapped }) });
+                const d = result.data;
+                showToast('导入完成: 新建' + (d.created||0) + '条, 更新' + (d.updated||0) + '条');
+                if (d.errors && d.errors.length > 0) {
+                    alert('部分行导入失败:\n' + d.errors.join('\n'));
+                }
+                navigate('products');
+            } catch(err) { showToast('导入失败: ' + err.message, 'error'); }
+        };
+        reader.readAsArrayBuffer(input.files[0]);
+    } catch(e) { showToast(e.message, 'error'); }
 }
 
 // ==================== 初始化 ====================
