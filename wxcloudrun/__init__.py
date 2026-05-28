@@ -25,6 +25,10 @@ db = SQLAlchemy(app)
 # 加载控制器
 from wxcloudrun import views
 
+# 加载后管 Blueprint
+from wxcloudrun.admin import admin_bp
+app.register_blueprint(admin_bp)
+
 # 加载配置
 app.config.from_object('config')
 

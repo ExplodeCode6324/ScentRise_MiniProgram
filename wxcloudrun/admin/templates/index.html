@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ScentRise 后管系统</title>
+    <link rel="stylesheet" href="/admin/static/style.css">
+</head>
+<body>
+    <div id="login-page" class="login-container">
+        <div class="login-box">
+            <h1>ScentRise</h1>
+            <p class="login-subtitle">后管系统</p>
+            <form id="login-form">
+                <input type="text" id="login-username" placeholder="用户名" required>
+                <input type="password" id="login-password" placeholder="密码" required>
+                <button type="submit">登 录</button>
+            </form>
+            <p id="login-error" class="error-msg" style="display:none"></p>
+        </div>
+    </div>
+
+    <div id="app-page" class="app-layout" style="display:none">
+        <!-- 侧边栏 -->
+        <nav class="sidebar">
+            <div class="sidebar-brand">ScentRise 后管</div>
+            <ul class="sidebar-nav">
+                <li><a href="#products" data-nav="products">📦 产品管理</a></li>
+                <li><a href="#tags" data-nav="tags">🏷️ 标签管理</a></li>
+                <li><a href="#collections" data-nav="collections">📁 合集管理</a></li>
+                <li><a href="#articles" data-nav="articles">📝 文章管理</a></li>
+                <li><a href="#company" data-nav="company">🏢 公司信息</a></li>
+            </ul>
+        </nav>
+
+        <!-- 主区域 -->
+        <main class="main-area">
+            <header class="topbar">
+                <span id="current-page-title">仪表盘</span>
+                <div class="topbar-right">
+                    <span id="topbar-user"></span>
+                    <button id="btn-logout" class="btn btn-sm">退出</button>
+                </div>
+            </header>
+            <div id="app-content" class="content-area">
+                <!-- 页面内容由 app.js 动态渲染 -->
+            </div>
+        </main>
+    </div>
+
+    <script src="/admin/static/app.js"></script>
+</body>
+</html>

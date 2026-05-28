@@ -91,7 +91,9 @@ def admin_login():
         return make_err_response('账号或密码错误')
     admin.last_login = datetime.now()
     db.session.commit()
-    return make_succ_response({'token': 'session', 'admin': admin.to_dict()})
+    from wxcloudrun.admin.auth import generate_token
+    token = generate_token(admin.id, admin.username, admin.role or 'editor')
+    return make_succ_response({'token': token, 'admin': admin.to_dict()})
 
 
 # --- 产品 CRUD ---
@@ -245,3 +247,334 @@ def admin_delete_article(article_id):
     db.session.delete(article)
     db.session.commit()
     return make_succ_empty_response()
+
+
+# --- 后管 产品列表/详情（分页、搜索） ---
+
+@app.route('/api/admin/products', methods=['GET'])
+def admin_get_products():
+    category_id = request.args.get('category_id', type=int)
+    keyword = request.args.get('keyword')
+    page = request.args.get('page', 1, type=int)
+    page_size = request.args.get('page_size', 20, type=int)
+    products, total = get_products(category_id=category_id, keyword=keyword, page=page, page_size=page_size, include_inactive=True)
+    return make_succ_response({'list': products, 'total': total, 'page': page, 'pageSize': page_size})
+
+
+@app.route('/api/admin/products/<int:product_id>', methods=['GET'])
+def admin_get_product(product_id):
+    product = get_product_by_id(product_id)
+    if not product:
+        return make_err_response('产品不存在')
+    from wxcloudrun.model import ProductImage
+    images = ProductImage.query.filter_by(product_id=product_id).order_by(ProductImage.sort_order).all()
+    data = product.to_dict()
+    data['images'] = [img.to_dict() for img in images]
+    return make_succ_response(data)
+
+
+# --- 后管 产品图片上传 ---
+
+@app.route('/api/admin/products/<int:product_id>/images', methods=['POST'])
+def admin_upload_product_image(product_id):
+    product = get_product_by_id(product_id)
+    if not product:
+        return make_err_response('产品不存在')
+    from wxcloudrun.model import ProductImage
+    image_type = request.form.get('image_type', 'detail')
+    file = request.files.get('file')
+    if not file:
+        return make_err_response('请选择文件')
+    # 生成云存储路径
+    import time
+    ext = file.filename.rsplit('.', 1)[-1] if '.' in file.filename else 'jpg'
+    if image_type == 'main':
+        cloud_path = 'product_image/{}/main.{}'.format(product_id, ext)
+    else:
+        cloud_path = 'product_image/{}/detail_{}.{}'.format(product_id, int(time.time()), ext)
+    # 上传到云存储（当前版本返回占位 URL，后续对接 CloudBase SDK）
+    # TODO: 使用 CloudBase SDK 上传并获取真实 URL
+    storage_url = 'https://7072-prod-d5gzqpr0f7ac5e384-1437634411.tcb.qcloud.la/' + cloud_path
+    if image_type == 'main':
+        ProductImage.query.filter_by(product_id=product_id, is_primary=True).update({'is_primary': False})
+        product.product_image = storage_url
+    img = ProductImage(product_id=product_id, image_url=storage_url, is_primary=(image_type == 'main'))
+    db.session.add(img)
+    db.session.commit()
+    return make_succ_response(img.to_dict())
+
+
+@app.route('/api/admin/products/<int:product_id>/images/<int:image_id>', methods=['DELETE'])
+def admin_delete_product_image(product_id, image_id):
+    from wxcloudrun.model import ProductImage
+    img = ProductImage.query.filter_by(id=image_id, product_id=product_id).first()
+    if not img:
+        return make_err_response('图片不存在')
+    was_primary = img.is_primary
+    db.session.delete(img)
+    if was_primary:
+        next_img = ProductImage.query.filter_by(product_id=product_id).order_by(ProductImage.sort_order).first()
+        if next_img:
+            next_img.is_primary = True
+            from wxcloudrun.model import Product
+            Product.query.filter_by(id=product_id).update({'product_image': next_img.image_url})
+        else:
+            from wxcloudrun.model import Product
+            Product.query.filter_by(id=product_id).update({'product_image': None})
+    db.session.commit()
+    return make_succ_empty_response()
+
+
+# --- 后管 标签 CRUD ---
+
+@app.route('/api/admin/tags', methods=['GET'])
+def admin_get_tags():
+    category = request.args.get('category')
+    return make_succ_response(get_tags(category=category))
+
+
+@app.route('/api/admin/tags/<int:tag_id>', methods=['GET'])
+def admin_get_tag(tag_id):
+    from wxcloudrun.model import Tag
+    tag = Tag.query.get(tag_id)
+    if not tag:
+        return make_err_response('标签不存在')
+    return make_succ_response(tag.to_dict())
+
+
+@app.route('/api/admin/tags', methods=['POST'])
+def admin_create_tag():
+    from wxcloudrun.model import Tag
+    data = request.get_json()
+    tag = Tag(name=data['name'], category=data.get('category', ''), description=data.get('description', ''),
+              sort_order=data.get('sortOrder', 0))
+    db.session.add(tag)
+    db.session.commit()
+    return make_succ_response(tag.to_dict())
+
+
+@app.route('/api/admin/tags/<int:tag_id>', methods=['PUT'])
+def admin_update_tag(tag_id):
+    from wxcloudrun.model import Tag
+    tag = Tag.query.get(tag_id)
+    if not tag:
+        return make_err_response('标签不存在')
+    data = request.get_json()
+    for field in ['name', 'category', 'description', 'icon', 'banner_image', 'sort_order']:
+        if field in data:
+            setattr(tag, field, data[field])
+    if 'sortOrder' in data:
+        tag.sort_order = data['sortOrder']
+    db.session.commit()
+    return make_succ_response(tag.to_dict())
+
+
+@app.route('/api/admin/tags/<int:tag_id>', methods=['DELETE'])
+def admin_delete_tag(tag_id):
+    from wxcloudrun.model import Tag
+    tag = Tag.query.get(tag_id)
+    if not tag:
+        return make_err_response('标签不存在')
+    db.session.delete(tag)
+    db.session.commit()
+    return make_succ_empty_response()
+
+
+@app.route('/api/admin/tags/<int:tag_id>/image', methods=['POST'])
+def admin_upload_tag_image(tag_id):
+    from wxcloudrun.model import Tag
+    tag = Tag.query.get(tag_id)
+    if not tag:
+        return make_err_response('标签不存在')
+    image_type = request.form.get('type', 'icon')
+    file = request.files.get('file')
+    if not file:
+        return make_err_response('请选择文件')
+    ext = file.filename.rsplit('.', 1)[-1] if '.' in file.filename else 'png'
+    if image_type == 'banner':
+        cloud_path = 'label_image/{}/banner.{}'.format(tag_id, ext)
+    else:
+        cloud_path = 'label_icon/{}/icon.{}'.format(tag_id, ext)
+    storage_url = 'https://7072-prod-d5gzqpr0f7ac5e384-1437634411.tcb.qcloud.la/' + cloud_path
+    if image_type == 'banner':
+        tag.banner_image = storage_url
+    else:
+        tag.icon = storage_url
+    db.session.commit()
+    return make_succ_response({'url': storage_url})
+
+
+# --- 后管 合集 CRUD ---
+
+@app.route('/api/admin/collections', methods=['GET'])
+def admin_get_collections():
+    return make_succ_response(get_collections(carousel_only=False))
+
+
+@app.route('/api/admin/collections/<int:col_id>', methods=['GET'])
+def admin_get_collection(col_id):
+    from wxcloudrun.model import Collection
+    col = Collection.query.get(col_id)
+    if not col:
+        return make_err_response('合集不存在')
+    return make_succ_response(col.to_dict())
+
+
+@app.route('/api/admin/collections', methods=['POST'])
+def admin_create_collection():
+    from wxcloudrun.model import Collection
+    data = request.get_json()
+    col = Collection(name=data['name'], description=data.get('description', ''),
+                     is_carousel=data.get('isCarousel', False),
+                     carousel_sort=data.get('carouselSort', 0),
+                     sort_order=data.get('sortOrder', 0))
+    db.session.add(col)
+    db.session.commit()
+    return make_succ_response(col.to_dict())
+
+
+@app.route('/api/admin/collections/<int:col_id>', methods=['PUT'])
+def admin_update_collection(col_id):
+    from wxcloudrun.model import Collection
+    col = Collection.query.get(col_id)
+    if not col:
+        return make_err_response('合集不存在')
+    data = request.get_json()
+    for field in ['name', 'description', 'cover_image', 'is_carousel', 'carousel_sort', 'sort_order']:
+        if field in data:
+            setattr(col, field, data[field])
+    if 'isCarousel' in data:
+        col.is_carousel = data['isCarousel']
+    if 'carouselSort' in data:
+        col.carousel_sort = data['carouselSort']
+    if 'sortOrder' in data:
+        col.sort_order = data['sortOrder']
+    db.session.commit()
+    return make_succ_response(col.to_dict())
+
+
+@app.route('/api/admin/collections/<int:col_id>', methods=['DELETE'])
+def admin_delete_collection(col_id):
+    from wxcloudrun.model import Collection
+    col = Collection.query.get(col_id)
+    if not col:
+        return make_err_response('合集不存在')
+    db.session.delete(col)
+    db.session.commit()
+    return make_succ_empty_response()
+
+
+@app.route('/api/admin/collections/<int:col_id>/products', methods=['PUT'])
+def admin_update_collection_products(col_id):
+    from wxcloudrun.model import Collection, collection_products
+    col = Collection.query.get(col_id)
+    if not col:
+        return make_err_response('合集不存在')
+    data = request.get_json()
+    product_ids = data.get('product_ids', [])
+    # 清空旧关联
+    db.session.execute(collection_products.delete().where(collection_products.c.collection_id == col_id))
+    # 插入新关联
+    for i, pid in enumerate(product_ids):
+        db.session.execute(collection_products.insert().values(collection_id=col_id, product_id=pid, sort_order=i))
+    db.session.commit()
+    return make_succ_response(col.to_dict())
+
+
+@app.route('/api/admin/collections/<int:col_id>/image', methods=['POST'])
+def admin_upload_collection_image(col_id):
+    from wxcloudrun.model import Collection
+    col = Collection.query.get(col_id)
+    if not col:
+        return make_err_response('合集不存在')
+    file = request.files.get('file')
+    if not file:
+        return make_err_response('请选择文件')
+    ext = file.filename.rsplit('.', 1)[-1] if '.' in file.filename else 'jpg'
+    cloud_path = 'collection_image/{}/cover.{}'.format(col_id, ext)
+    storage_url = 'https://7072-prod-d5gzqpr0f7ac5e384-1437634411.tcb.qcloud.la/' + cloud_path
+    col.cover_image = storage_url
+    db.session.commit()
+    return make_succ_response({'url': storage_url})
+
+
+# --- 后管 文章列表（含草稿） ---
+
+@app.route('/api/admin/articles', methods=['GET'])
+def admin_get_articles():
+    page = request.args.get('page', 1, type=int)
+    page_size = request.args.get('page_size', 20, type=int)
+    status = request.args.get('status', 'all')
+    published_only = True if status == 'published' else (False if status == 'draft' else None)
+    articles, total = get_articles(page=page, page_size=page_size, published_only=published_only)
+    return make_succ_response({'list': articles, 'total': total, 'page': page, 'pageSize': page_size})
+
+
+@app.route('/api/admin/articles/<int:article_id>', methods=['GET'])
+def admin_get_article(article_id):
+    article = get_article_by_id(article_id)
+    if not article:
+        return make_err_response('文章不存在')
+    return make_succ_response(article.to_dict())
+
+
+@app.route('/api/admin/articles/<int:article_id>/image', methods=['POST'])
+def admin_upload_article_image(article_id):
+    article = get_article_by_id(article_id)
+    if not article:
+        return make_err_response('文章不存在')
+    file = request.files.get('file')
+    if not file:
+        return make_err_response('请选择文件')
+    ext = file.filename.rsplit('.', 1)[-1] if '.' in file.filename else 'jpg'
+    cloud_path = 'article_image/{}/cover.{}'.format(article_id, ext)
+    storage_url = 'https://7072-prod-d5gzqpr0f7ac5e384-1437634411.tcb.qcloud.la/' + cloud_path
+    article.cover_image = storage_url
+    db.session.commit()
+    return make_succ_response({'url': storage_url})
+
+
+# --- 后管 公司信息 ---
+
+@app.route('/api/admin/company', methods=['GET'])
+def admin_get_company():
+    from wxcloudrun.model import CompanyInfo
+    info = CompanyInfo.query.first()
+    return make_succ_response(info.to_dict() if info else {})
+
+
+@app.route('/api/admin/company', methods=['PUT'])
+def admin_update_company():
+    from wxcloudrun.model import CompanyInfo
+    data = request.get_json()
+    info = CompanyInfo.query.first()
+    if not info:
+        info = CompanyInfo()
+        db.session.add(info)
+    for field in ['name', 'intro', 'phone', 'wechat_id', 'email', 'address', 'business_hours']:
+        if field in data:
+            setattr(info, field, data[field])
+    if 'wechatId' in data:
+        info.wechat_id = data['wechatId']
+    if 'businessHours' in data:
+        info.business_hours = data['businessHours']
+    db.session.commit()
+    return make_succ_response(info.to_dict())
+
+
+@app.route('/api/admin/company/logo', methods=['POST'])
+def admin_upload_company_logo():
+    from wxcloudrun.model import CompanyInfo
+    file = request.files.get('file')
+    if not file:
+        return make_err_response('请选择文件')
+    info = CompanyInfo.query.first()
+    if not info:
+        info = CompanyInfo()
+        db.session.add(info)
+    ext = file.filename.rsplit('.', 1)[-1] if '.' in file.filename else 'png'
+    cloud_path = 'company/logo.{}'.format(ext)
+    storage_url = 'https://7072-prod-d5gzqpr0f7ac5e384-1437634411.tcb.qcloud.la/' + cloud_path
+    info.logo = storage_url
+    db.session.commit()
+    return make_succ_response({'url': storage_url})

@@ -8,9 +8,11 @@ logger = logging.getLogger('log')
 
 # ==================== 产品 ====================
 
-def get_products(category_id=None, tag_id=None, keyword=None, page=1, page_size=20):
+def get_products(category_id=None, tag_id=None, keyword=None, page=1, page_size=20, include_inactive=False):
     try:
-        q = Product.query.filter(Product.is_active == True)
+        q = Product.query
+        if not include_inactive:
+            q = q.filter(Product.is_active == True)
         if category_id:
             q = q.filter(Product.category_id == category_id)
         if tag_id:

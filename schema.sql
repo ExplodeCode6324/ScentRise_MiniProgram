@@ -77,6 +77,7 @@ CREATE TABLE tags (
     name        VARCHAR(50)  NOT NULL UNIQUE COMMENT '标签名',
     category    VARCHAR(50)  COMMENT '标签分类(适用产品/产品形态/功效)',
     icon        VARCHAR(500) COMMENT '标签图标URL',
+    banner_image VARCHAR(500) COMMENT '标签横幅大图URL',
     sort_order  INT DEFAULT 0,
     created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -141,3 +142,16 @@ CREATE TABLE admins (
     created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================
+-- 10. 产品图片表
+-- ============================================
+CREATE TABLE product_images (
+    id          INT PRIMARY KEY AUTO_INCREMENT,
+    product_id  INT NOT NULL COMMENT '所属产品ID',
+    image_url   VARCHAR(500) NOT NULL COMMENT '图片URL',
+    sort_order  INT DEFAULT 0 COMMENT '排序(越小越前)',
+    is_primary  TINYINT(1) DEFAULT 0 COMMENT '1=主图',
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='产品图片表';

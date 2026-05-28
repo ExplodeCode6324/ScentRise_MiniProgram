@@ -37,13 +37,14 @@ class Tag(db.Model):
     name = db.Column(db.String(50), nullable=False, unique=True)
     category = db.Column(db.String(50))
     icon = db.Column(db.String(500))
+    banner_image = db.Column(db.String(500))
     sort_order = db.Column(db.Integer, default=0)
     created_at = db.Column('created_at', db.TIMESTAMP, default=datetime.now)
     updated_at = db.Column('updated_at', db.TIMESTAMP, default=datetime.now, onupdate=datetime.now)
 
     def to_dict(self):
         return {'id': self.id, 'name': self.name, 'category': self.category,
-                'icon': self.icon, 'sortOrder': self.sort_order}
+                'icon': self.icon, 'bannerImage': self.banner_image, 'sortOrder': self.sort_order}
 
 
 class Product(db.Model):
@@ -167,4 +168,23 @@ class Admin(db.Model):
             'id': self.id, 'username': self.username, 'realName': self.real_name,
             'role': self.role, 'isActive': self.is_active,
             'lastLogin': str(self.last_login) if self.last_login else None,
+        }
+
+
+class ProductImage(db.Model):
+    __tablename__ = 'product_images'
+    id = db.Column(db.Integer, primary_key=True)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id', ondelete='CASCADE'), nullable=False)
+    image_url = db.Column(db.String(500), nullable=False)
+    sort_order = db.Column(db.Integer, default=0)
+    is_primary = db.Column(db.Boolean, default=False)
+    created_at = db.Column('created_at', db.TIMESTAMP, default=datetime.now)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'productId': self.product_id,
+            'imageUrl': self.image_url,
+            'sortOrder': self.sort_order,
+            'isPrimary': self.is_primary,
         }
