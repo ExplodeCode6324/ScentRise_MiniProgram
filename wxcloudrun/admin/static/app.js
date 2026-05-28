@@ -107,7 +107,9 @@ function navigate(hash) {
             if (dp) {
                 document.getElementById('current-page-title').textContent = dp.title;
                 document.getElementById('app-content').innerHTML = '<div class="card"><p>加载中...</p></div>';
-                dp.render().catch(e => {
+                dp.render().then(html => {
+                    document.getElementById('app-content').innerHTML = html;
+                }).catch(e => {
                     document.getElementById('app-content').innerHTML = '<div class="card"><p style="color:red">加载失败: ' + e.message + '</p></div>';
                 });
                 highlightNav(type);
@@ -119,7 +121,9 @@ function navigate(hash) {
     }
     document.getElementById('current-page-title').textContent = page.title;
     document.getElementById('app-content').innerHTML = '<div class="card"><p>加载中...</p></div>';
-    page.render().catch(e => {
+    page.render().then(html => {
+        document.getElementById('app-content').innerHTML = html;
+    }).catch(e => {
         document.getElementById('app-content').innerHTML = '<div class="card"><p style="color:red">加载失败: ' + e.message + '</p></div>';
     });
     // 高亮导航
