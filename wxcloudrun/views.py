@@ -12,6 +12,7 @@ from wxcloudrun.dao import (
 from wxcloudrun.model import Product, Article, Category, CompanyInfo, Admin
 from wxcloudrun.response import make_succ_empty_response, make_succ_response, make_err_response
 from wxcloudrun.storage import upload as storage_upload
+from wxcloudrun.storage import delete_files as storage_delete
 
 
 @app.route('/')
@@ -147,6 +148,22 @@ def admin_delete_product(product_id):
     product = get_product_by_id(product_id)
     if not product:
         return make_err_response('产品不存在')
+
+    # 收集所有关联的云存储文件
+    storage_urls = []
+    if product.product_image:
+        storage_urls.append(product.product_image)
+    from wxcloudrun.model import ProductImage
+    images = ProductImage.query.filter_by(product_id=product_id).all()
+    for img in images:
+        if img.image_url:
+            storage_urls.append(img.image_url)
+
+    # 先删云存储（失败不阻塞）
+    if storage_urls:
+        result = storage_delete(storage_urls)
+        app.logger.info('Product %d: cleaned %d storage files', product_id, result.get('deleted', 0))
+
     db.session.delete(product)
     db.session.commit()
     return make_succ_empty_response()
@@ -164,13 +181,13 @@ def admin_import_excel():
     for i, row in enumerate(rows):
         try:
             series_name = row.get('productSeries', '').strip()
-            tag_names = row.get('tags', [])  # ["烘培","糖果","饮料"]
+            tag_names = row.get('tags', [])  # 前端传来的标签列表
 
             if not series_name or not row.get('productModel'):
                 imported['errors'].append(f'第{i+2}行: 缺少产品系列或型号')
                 continue
 
-            # 自动创建/匹配产品系列
+            # 自动创建/匹配产品系列（作为分类）
             cat = get_or_create_category(series_name)
 
             # 产品：按型号查重，存在则更新
@@ -194,10 +211,22 @@ def admin_import_excel():
                 db.session.flush()
                 imported['created'] += 1
 
-            # 自动创建/关联标签
+            # 标签关联：产品系列作为标签(category='产品系列',sortOrder=1)
+            all_tags = []
+            series_tag = get_or_create_tag(series_name, category='产品系列', sort_order=1)
+            if series_tag:
+                all_tags.append(series_tag)
+
+            # 适用产品标签(category='适用产品',sortOrder=2)
             if tag_names:
-                tags = [get_or_create_tag(name) for name in tag_names if name]
-                product.tags = [t for t in tags if t]
+                for name in tag_names:
+                    name = name.strip()
+                    if name and name != series_name:  # 去重：如果和系列同名只保留一个
+                        t = get_or_create_tag(name, category='适用产品', sort_order=2)
+                        if t:
+                            all_tags.append(t)
+
+            product.tags = all_tags
 
         except Exception as e:
             imported['errors'].append(f'第{i+2}行: {str(e)}')

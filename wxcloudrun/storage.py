@@ -216,3 +216,65 @@ def get_download_url(cloud_path_or_fileid: str) -> str:
     # 没有 file_id 时用 CDN 兜底
     cdn = f'https://7072-prod-d5gzqpr0f7ac5e384-1437634411.tcb.qcloud.la'
     return f'{cdn}/{cloud_path_or_fileid}'
+
+
+def _cdn_to_fileid(url: str) -> str:
+    """将 CDN URL 或 cloud:// ID 统一转为 cloud://file_id 格式"""
+    if not url:
+        return None
+    if url.startswith('cloud://'):
+        return url
+    # CDN: https://{bucket}.tcb.qcloud.la/{path}
+    import re
+    m = re.match(r'https?://([^.]+)\.tcb\.qcloud\.la/(.+)', url)
+    if m:
+        bucket = m.group(1)
+        path = m.group(2)
+        return f'cloud://{TCB_ENV_ID}.{bucket}/{path}'
+    return None
+
+
+def delete_files(urls: list) -> dict:
+    """批量删除云存储文件
+
+    Args:
+        urls: CDN URL 或 cloud://file_id 列表
+
+    Returns:
+        dict: {'deleted': N} 或 {'deleted': 0, 'error': '...'}
+    """
+    file_ids = []
+    for u in urls:
+        fid = _cdn_to_fileid(u)
+        if fid:
+            file_ids.append(fid)
+
+    if not file_ids:
+        return {'deleted': 0}
+
+    try:
+        access_token = _get_access_token()
+    except RuntimeError as e:
+        logger.warning('storage.delete_files: access_token 不可用, 跳过云存储清理: %s', e)
+        return {'deleted': 0, 'warning': str(e)}
+
+    try:
+        resp = requests.post(
+            'https://api.weixin.qq.com/tcb/batchdeletefile',
+            params={'access_token': access_token},
+            json={'env': TCB_ENV_ID, 'fileid_list': file_ids},
+            timeout=TIMEOUT,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+
+        if data.get('errcode', -1) != 0:
+            logger.error('storage.delete_files API error: %s', data)
+            return {'deleted': 0, 'error': data.get('errmsg', 'unknown')}
+
+        deleted = len(data.get('delete_list', []))
+        logger.info('storage.delete_files OK: %d/%d files', deleted, len(file_ids))
+        return {'deleted': deleted}
+    except requests.RequestException as e:
+        logger.error('storage.delete_files network error: %s', e)
+        return {'deleted': 0, 'error': str(e)}

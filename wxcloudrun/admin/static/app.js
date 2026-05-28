@@ -583,14 +583,28 @@ async function importExcel(input) {
                 const workbook = XLSX.read(data, {type: 'array'});
                 const sheet = workbook.Sheets[workbook.SheetNames[0]];
                 const rows = XLSX.utils.sheet_to_json(sheet);
-                // 字段映射: 产品系列→productSeries, 产品名称→productName, 产品型号→productModel, 产品描述→productDesc
-                const mapped = rows.map(r => ({
-                    productSeries: r['产品系列'] || r['productSeries'] || '',
-                    productName: r['产品名称'] || r['productName'] || '',
-                    productModel: r['产品型号'] || r['productModel'] || '',
-                    productDesc: r['产品描述'] || r['productDesc'] || '',
-                    tags: (r['标签'] || r['tags'] || '').toString().split(/[,，;；]/).map(t => t.trim()).filter(Boolean),
-                }));
+                // Excel 列名映射（兼容「产品简介」和「产品描述」两种表头）
+                // 标签列：E-K列独立检测 √ → 自动加入 tags 数组
+                const TAG_COLUMNS = ['烘培', '糖果', '饮料', '炒货', '乳品', '膨化', '电子烟'];
+                const mapped = rows.map(r => {
+                    const tags = [];
+                    // 检测 √ 标记的标签列
+                    TAG_COLUMNS.forEach(col => {
+                        const val = r[col];
+                        if (val === '√' || val === 'v' || val === 'V' || val === 1 || val === '1' || val === true) {
+                            tags.push(col);
+                        }
+                        // 也支持逗号分隔的「标签」列（兼容旧格式）
+                    });
+                    const legacyTags = (r['标签'] || r['tags'] || '').toString().split(/[,，;；]/).map(t => t.trim()).filter(Boolean);
+                    return {
+                        productSeries: r['产品系列'] || r['productSeries'] || '',
+                        productName: r['产品名称'] || r['productName'] || '',
+                        productModel: r['产品型号'] || r['productModel'] || '',
+                        productDesc: r['产品简介'] || r['产品描述'] || r['productDesc'] || '',
+                        tags: [...new Set([...legacyTags, ...tags])],  // 合并去重
+                    };
+                });
                 const result = await apiFetch('/api/admin/import', { method: 'POST', body: JSON.stringify({ rows: mapped }) });
                 const d = result.data;
                 showToast('导入完成: 新建' + (d.created||0) + '条, 更新' + (d.updated||0) + '条');

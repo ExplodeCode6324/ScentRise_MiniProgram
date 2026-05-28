@@ -85,11 +85,11 @@ def get_tags(category=None):
         return []
 
 
-def get_or_create_tag(name, category='适用产品'):
+def get_or_create_tag(name, category='适用产品', sort_order=0):
     try:
         tag = Tag.query.filter(Tag.name == name).first()
         if not tag:
-            tag = Tag(name=name, category=category)
+            tag = Tag(name=name, category=category, sort_order=sort_order)
             db.session.add(tag)
             db.session.flush()
         return tag
