@@ -11,6 +11,7 @@ from wxcloudrun.dao import (
 )
 from wxcloudrun.model import Product, Article, Category, CompanyInfo, Admin
 from wxcloudrun.response import make_succ_empty_response, make_succ_response, make_err_response
+from wxcloudrun.storage import upload as storage_upload
 
 
 @app.route('/')
@@ -292,9 +293,11 @@ def admin_upload_product_image(product_id):
         cloud_path = 'product_image/{}/main.{}'.format(product_id, ext)
     else:
         cloud_path = 'product_image/{}/detail_{}.{}'.format(product_id, int(time.time()), ext)
-    # 上传到云存储（当前版本返回占位 URL，后续对接 CloudBase SDK）
-    # TODO: 使用 CloudBase SDK 上传并获取真实 URL
-    storage_url = 'https://7072-prod-d5gzqpr0f7ac5e384-1437634411.tcb.qcloud.la/' + cloud_path
+    # 上传到云存储
+    result = storage_upload(file.read(), cloud_path)
+    if not result['success']:
+        return make_err_response(result.get('error', '上传失败'))
+    storage_url = result['url']
     if image_type == 'main':
         ProductImage.query.filter_by(product_id=product_id, is_primary=True).update({'is_primary': False})
         product.product_image = storage_url
@@ -395,7 +398,10 @@ def admin_upload_tag_image(tag_id):
         cloud_path = 'label_image/{}/banner.{}'.format(tag_id, ext)
     else:
         cloud_path = 'label_icon/{}/icon.{}'.format(tag_id, ext)
-    storage_url = 'https://7072-prod-d5gzqpr0f7ac5e384-1437634411.tcb.qcloud.la/' + cloud_path
+    result = storage_upload(file.read(), cloud_path)
+    if not result['success']:
+        return make_err_response(result.get('error', '上传失败'))
+    storage_url = result['url']
     if image_type == 'banner':
         tag.banner_image = storage_url
     else:
@@ -492,7 +498,10 @@ def admin_upload_collection_image(col_id):
         return make_err_response('请选择文件')
     ext = file.filename.rsplit('.', 1)[-1] if '.' in file.filename else 'jpg'
     cloud_path = 'collection_image/{}/cover.{}'.format(col_id, ext)
-    storage_url = 'https://7072-prod-d5gzqpr0f7ac5e384-1437634411.tcb.qcloud.la/' + cloud_path
+    result = storage_upload(file.read(), cloud_path)
+    if not result['success']:
+        return make_err_response(result.get('error', '上传失败'))
+    storage_url = result['url']
     col.cover_image = storage_url
     db.session.commit()
     return make_succ_response({'url': storage_url})
@@ -528,15 +537,16 @@ def admin_upload_article_image(article_id):
         return make_err_response('请选择文件')
     ext = file.filename.rsplit('.', 1)[-1] if '.' in file.filename else 'jpg'
     cloud_path = 'article_image/{}/cover.{}'.format(article_id, ext)
-    storage_url = 'https://7072-prod-d5gzqpr0f7ac5e384-1437634411.tcb.qcloud.la/' + cloud_path
+    result = storage_upload(file.read(), cloud_path)
+    if not result['success']:
+        return make_err_response(result.get('error', '上传失败'))
+    storage_url = result['url']
     article.cover_image = storage_url
     db.session.commit()
     return make_succ_response({'url': storage_url})
 
 
 # --- 后管 公司信息 ---
-
-STORAGE_BASE = 'https://7072-prod-d5gzqpr0f7ac5e384-1437634411.tcb.qcloud.la'
 
 
 def _get_or_create_company_info():
@@ -586,7 +596,10 @@ def admin_upload_company_logo():
     info = _get_or_create_company_info()
     ext = file.filename.rsplit('.', 1)[-1] if '.' in file.filename else 'png'
     cloud_path = 'company/{}/logo.{}'.format(info.id, ext)
-    storage_url = STORAGE_BASE + cloud_path
+    result = storage_upload(file.read(), cloud_path)
+    if not result['success']:
+        return make_err_response(result.get('error', '上传失败'))
+    storage_url = result['url']
     info.logo = storage_url
     db.session.commit()
     return make_succ_response({'url': storage_url, 'id': info.id})
@@ -600,7 +613,10 @@ def admin_upload_company_image():
     info = _get_or_create_company_info()
     ext = file.filename.rsplit('.', 1)[-1] if '.' in file.filename else 'png'
     cloud_path = 'company/{}/image.{}'.format(info.id, ext)
-    storage_url = STORAGE_BASE + cloud_path
+    result = storage_upload(file.read(), cloud_path)
+    if not result['success']:
+        return make_err_response(result.get('error', '上传失败'))
+    storage_url = result['url']
     info.company_image = storage_url
     db.session.commit()
     return make_succ_response({'url': storage_url, 'id': info.id})
