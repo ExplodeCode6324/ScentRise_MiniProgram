@@ -551,13 +551,15 @@ def admin_update_company():
     if not info:
         info = CompanyInfo()
         db.session.add(info)
-    for field in ['name', 'intro', 'phone', 'wechat_id', 'email', 'address', 'business_hours']:
+    for field in ['name', 'intro', 'phone', 'wechat_id', 'email', 'address', 'business_hours', 'company_image']:
         if field in data:
             setattr(info, field, data[field])
     if 'wechatId' in data:
         info.wechat_id = data['wechatId']
     if 'businessHours' in data:
         info.business_hours = data['businessHours']
+    if 'companyImage' in data:
+        info.company_image = data['companyImage']
     db.session.commit()
     return make_succ_response(info.to_dict())
 
@@ -576,5 +578,23 @@ def admin_upload_company_logo():
     cloud_path = 'company/logo.{}'.format(ext)
     storage_url = 'https://7072-prod-d5gzqpr0f7ac5e384-1437634411.tcb.qcloud.la/' + cloud_path
     info.logo = storage_url
+    db.session.commit()
+    return make_succ_response({'url': storage_url})
+
+
+@app.route('/api/admin/company/image', methods=['POST'])
+def admin_upload_company_image():
+    from wxcloudrun.model import CompanyInfo
+    file = request.files.get('file')
+    if not file:
+        return make_err_response('请选择文件')
+    info = CompanyInfo.query.first()
+    if not info:
+        info = CompanyInfo()
+        db.session.add(info)
+    ext = file.filename.rsplit('.', 1)[-1] if '.' in file.filename else 'png'
+    cloud_path = 'company/image.{}'.format(ext)
+    storage_url = 'https://7072-prod-d5gzqpr0f7ac5e384-1437634411.tcb.qcloud.la/' + cloud_path
+    info.company_image = storage_url
     db.session.commit()
     return make_succ_response({'url': storage_url})

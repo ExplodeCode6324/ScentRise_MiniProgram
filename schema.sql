@@ -116,6 +116,7 @@ CREATE TABLE articles (
 CREATE TABLE company_info (
     id              INT PRIMARY KEY AUTO_INCREMENT,
     logo            VARCHAR(500) COMMENT 'Logo URL',
+    company_image   VARCHAR(500) COMMENT '公司实景图片URL',
     name            VARCHAR(200) COMMENT '公司名称',
     intro           TEXT         COMMENT '公司简介',
     phone           VARCHAR(20)  COMMENT '联系电话',

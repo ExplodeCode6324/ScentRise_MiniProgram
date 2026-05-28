@@ -132,6 +132,7 @@ class CompanyInfo(db.Model):
     __tablename__ = 'company_info'
     id = db.Column(db.Integer, primary_key=True)
     logo = db.Column(db.String(500))
+    company_image = db.Column(db.String(500))
     name = db.Column(db.String(200))
     intro = db.Column(db.Text)
     phone = db.Column(db.String(20))
@@ -145,7 +146,8 @@ class CompanyInfo(db.Model):
 
     def to_dict(self):
         return {
-            'id': self.id, 'logo': self.logo, 'name': self.name, 'intro': self.intro,
+            'id': self.id, 'logo': self.logo, 'companyImage': self.company_image,
+            'name': self.name, 'intro': self.intro,
             'phone': self.phone, 'wechatQr': self.wechat_qr, 'wechatId': self.wechat_id,
             'email': self.email, 'address': self.address, 'businessHours': self.business_hours,
         }
