@@ -35,3 +35,11 @@ app.config.from_object('config')
 # 自动建表（云托管首次部署时数据库为空）
 with app.app_context():
     db.create_all()
+
+# 启动时打印关键环境变量状态，便于排查
+import os as _os
+for _var in ['WECHAT_APPID', 'WECHAT_APPSECRET', 'WECHAT_ACCESS_TOKEN',
+             'TCB_ENV_ID', 'TCB_API_KEY', 'MYSQL_ADDRESS']:
+    val = _os.environ.get(_var, '')
+    _masked = val[:8] + '...' + val[-4:] if len(val) > 16 else (val[:4] + '***' if len(val) > 4 else val)
+    app.logger.info('ENV %s = %s', _var, _masked if val else '(NOT SET)')
