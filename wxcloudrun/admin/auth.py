@@ -20,7 +20,9 @@ def generate_token(admin_id, username, role='editor'):
         'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=JWT_EXP_HOURS),
         'iat': datetime.datetime.utcnow(),
     }
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    # PyJWT 1.x 返回 bytes，2.x 返回 str，统一转为 str
+    return token if isinstance(token, str) else token.decode()
 
 
 def require_admin(f):
